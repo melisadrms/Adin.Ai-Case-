@@ -1,5 +1,6 @@
 <template>
   <b-container id="app" class="container">
+    <h1>Deneme</h1>
     <b-row class="mb-4">
       <b-col class="col-md-6">
         <b-card class="card shadow">
