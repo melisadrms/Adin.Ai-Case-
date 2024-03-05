@@ -1,95 +1,60 @@
 <template>
   <b-container id="app" class="container">
-    <h1>Deneme</h1>
-    <b-row class="mb-4">
-      <b-col class="col-md-6">
-        <b-card class="card shadow">
-          <div class="card-body">
-            <h5 class="card-title">Brand Seçin</h5>
-            <select
-              v-model="selectedBrand"
-              class="form-select"
-              @change="updateCampaigns"
-            >
-              <option value="">Select Brand</option>
-              <option v-for="brand in uniqueBrands" :key="brand" :value="brand">
-                {{ brand }}
-              </option>
-            </select>
-          </div>
-        </b-card>
-      </b-col>
-      <b-col class="col-md-6">
-        <b-card class="card shadow">
-          <div class="card-body">
-            <h5 class="card-title">Campaign Seçin</h5>
-            <select
-              v-model="selectedCampaign"
-              class="form-select"
-              :disabled="!selectedBrand"
-            >
-              <option value="">Select Campaign</option>
-              <option
-                v-for="campaign in axiosData.campaignStatus.campaign"
-                :key="campaign"
-                :value="campaign"
-              >
-                {{ campaign }}
-              </option>
-            </select>
-          </div>
-        </b-card>
-      </b-col>
-    </b-row>
-    <b-row class="row mb-4">
-      <b-col class="col-md-12">
-        <div class="card shadow">
-          <div class="card-body">
-            <h5 class="card-title">Table</h5>
-            <b-table striped hover :items="items" :fields="fields"></b-table>
-          </div>
-        </div>
-      </b-col>
-    </b-row>
-    <b-row class="row">
-      <b-col class="col-md-6">
-        <b-card class="card shadow">
-          <div class="card-body">
-            <h5 class="card-title">Line Chart</h5>
-            <apexchart
-              :options="lineChartOptions"
-              :series="lineChartSeries"
-              type="line"
-              class="line-chart"
-            />
-          </div>
-        </b-card>
-      </b-col>
-      <b-col class="col-md-6">
-        <b-card class="card shadow">
-          <div class="card-body">
-            <h5 class="card-title">Bar Chart</h5>
-            <apexchart
-              :options="barChartOptions"
-              :series="barChartSeries"
-              type="bar"
-              class="bar-chart"
-            />
-          </div>
-        </b-card>
-      </b-col>
-    </b-row>
+    <div class="d-flex justify-content-center">
+      <SelectFilter
+        :title="'Marka Seçin'"
+        :placeholder="'Marka Seçin'"
+        :items="uniqueBrands"
+        v-model="selectedBrand"
+        @update:selectedItem="setSelectedBrand"
+        class="col-md-6"
+      />
+
+      <SelectFilter
+        v-if="selectedBrand"
+        :title="'Campaign Seçin'"
+        :placeholder="'Select Campaign'"
+        :items="
+          axiosData.campaignStatus ? axiosData.campaignStatus.campaign : []
+        "
+        v-model="selectedCampaign"
+        @update:selectedItem="setSelectedCampaign"
+        class="col-md-6"
+      />
+    </div>
+    <DataTable :items="items" :fields="fields" />
+
+    <div class="d-flex justify-content-center">
+      <div class="col-md-6">
+        <LineChart
+          :chart-options="lineChartOptions"
+          :chart-series="lineChartSeries"
+        />
+      </div>
+      <div class="col-md-6">
+        <BarChart
+          :chart-options="barChartOptions"
+          :chart-series="barChartSeries"
+        />
+      </div>
+    </div>
   </b-container>
 </template>
 
 <script>
 import axios from "axios";
-import VueApexCharts from "vue-apexcharts";
+import SelectFilter from "./components/SelectFilter.vue";
+import DataTable from "./components/DataTable.vue";
+import LineChart from "./components/LineChart.vue";
+import BarChart from "./components/BarChart.vue";
 
 export default {
   name: "App",
   components: {
-    apexchart: VueApexCharts,
+    SelectFilter,
+    DataTable,
+    LineChart,
+    BarChart,
   },
   data() {
     return {
@@ -113,21 +78,13 @@ export default {
       ],
       items: [],
       lineChartOptions: {
-        chart: {
-          id: "line-chart",
-        },
-        xaxis: {
-          categories: [],
-        },
+        chart: { id: "line-chart" },
+        xaxis: { categories: [] },
       },
       lineChartSeries: [],
       barChartOptions: {
-        chart: {
-          id: "bar-chart",
-        },
-        xaxis: {
-          categories: [],
-        },
+        chart: { id: "bar-chart" },
+        xaxis: { categories: [] },
       },
       barChartSeries: [],
     };
@@ -135,11 +92,21 @@ export default {
   created() {
     this.loadData();
   },
+
+  watch: {
+    selectedCampaign(newValue, oldValue) {
+      console.log("Selected Campaign changed:", newValue);
+      if (newValue !== oldValue) {
+        this.updateItems();
+      }
+    },
+  },
   methods: {
     loadData() {
       axios
         .get(this.url)
         .then((response) => {
+          console.log("API response:", response.data);
           if (response.data && response.data.campaignStatus) {
             this.axiosData = response.data;
             this.updateItems();
@@ -153,35 +120,69 @@ export default {
           console.error("API veri alınamadı:", error);
         });
     },
-    updateCampaigns() {
-      this.selectedCampaign = "";
+
+    setSelectedBrand(selectedBrand) {
+      this.selectedBrand = selectedBrand;
     },
+
+    setSelectedCampaign(selectedCampaign) {
+      this.selectedCampaign = selectedCampaign;
+    },
+
     updateItems() {
       if (!this.axiosData.campaignStatus) return;
 
       const { campaignStatus } = this.axiosData;
-      const numCampaigns = campaignStatus.brand.length;
+      let filteredItems = [];
 
-      this.items = [];
+      if (this.selectedCampaign) {
+        const selectedCampaignIndex = campaignStatus.campaign.findIndex(
+          (campaign) => campaign === this.selectedCampaign
+        );
 
-      for (let i = 0; i < numCampaigns; i++) {
-        const item = {
-          campaign: campaignStatus.campaign[i] || "",
-          brand: campaignStatus.brand[i] || "",
-          effectiveness: campaignStatus.effectiveness[i] || 0,
-          effectivenessTrend: campaignStatus.effectivenessTrend[i] || 0,
-          media: campaignStatus.media[i] || 0,
-          mediaTrend: campaignStatus.mediaTrend[i] || 0,
-          creative: campaignStatus.creative[i] || 0,
-          creativeTrend: campaignStatus.creativeTrend[i] || 0,
-          growth: campaignStatus.growth[i] || 0,
-          growthTrend: campaignStatus.growthTrend[i] || 0,
-          social: campaignStatus.social[i] || 0,
-          socialTrend: campaignStatus.socialTrend[i] || 0,
-        };
+        if (selectedCampaignIndex !== -1) {
+          const item = {
+            campaign: campaignStatus.campaign[selectedCampaignIndex] || "",
+            brand: campaignStatus.brand[selectedCampaignIndex] || "",
+            effectiveness:
+              campaignStatus.effectiveness[selectedCampaignIndex] || 0,
+            effectivenessTrend:
+              campaignStatus.effectivenessTrend[selectedCampaignIndex] || 0,
+            media: campaignStatus.media[selectedCampaignIndex] || 0,
+            mediaTrend: campaignStatus.mediaTrend[selectedCampaignIndex] || 0,
+            creative: campaignStatus.creative[selectedCampaignIndex] || 0,
+            creativeTrend:
+              campaignStatus.creativeTrend[selectedCampaignIndex] || 0,
+            growth: campaignStatus.growth[selectedCampaignIndex] || 0,
+            growthTrend: campaignStatus.growthTrend[selectedCampaignIndex] || 0,
+            social: campaignStatus.social[selectedCampaignIndex] || 0,
+            socialTrend: campaignStatus.socialTrend[selectedCampaignIndex] || 0,
+          };
 
-        this.items.push(item);
+          filteredItems.push(item);
+        }
+      } else {
+        for (let i = 0; i < campaignStatus.brand.length; i++) {
+          const item = {
+            campaign: campaignStatus.campaign[i] || "",
+            brand: campaignStatus.brand[i] || "",
+            effectiveness: campaignStatus.effectiveness[i] || 0,
+            effectivenessTrend: campaignStatus.effectivenessTrend[i] || 0,
+            media: campaignStatus.media[i] || 0,
+            mediaTrend: campaignStatus.mediaTrend[i] || 0,
+            creative: campaignStatus.creative[i] || 0,
+            creativeTrend: campaignStatus.creativeTrend[i] || 0,
+            growth: campaignStatus.growth[i] || 0,
+            growthTrend: campaignStatus.growthTrend[i] || 0,
+            social: campaignStatus.social[i] || 0,
+            socialTrend: campaignStatus.socialTrend[i] || 0,
+          };
+
+          filteredItems.push(item);
+        }
       }
+
+      this.items = filteredItems;
     },
     updateLineChart() {
       const { scoreTrend } = this.axiosData;
@@ -219,6 +220,11 @@ export default {
 </script>
 
 <style>
+.trend-icon {
+  font-size: 1.2rem;
+  border-radius: 50%;
+  padding: 0.2rem;
+}
 #app {
   font-family: Avenir, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -228,50 +234,14 @@ export default {
   margin-top: 60px;
 }
 
-.chart-container {
-  display: flex;
-  justify-content: space-around;
-  margin-top: 20px;
-}
-
-.chart {
-  width: 100%;
-}
-.card {
-  border: none;
-  border-radius: 10px;
-  transition: all 0.3s ease;
-}
-
-.card:hover {
-  transform: translateY(-5px);
-}
-
 .form-select {
   background-color: #fff;
   border: 1px solid #ced4da;
   border-radius: 5px;
 }
 
-.card-title {
-  color: #333;
-  font-weight: bold;
-}
-
-.line-chart,
-.bar-chart {
-  width: 100%;
-  height: 300px;
-  border-radius: 10px;
-}
-
-.line-chart path,
-.bar-chart path {
-  transition: all 0.3s ease;
-}
-
-.line-chart:hover path,
-.bar-chart:hover path {
-  stroke-width: 3px;
+.card.shadow {
+  padding: 0.5rem;
+  margin: 0.5rem;
 }
 </style>
